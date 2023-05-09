@@ -1,0 +1,123 @@
+---
+title: "Innlevering 2 SOK-2012"
+author: "24"
+date: 9-5-2023
+format: pdf
+editor: visual
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+```
+
+```{r, include=FALSE}
+n <- 100
+reps <- c(10, 100, 1000, 10000, 100000)
+set.seed(300)
+M <- 100000
+
+data <- array(sample(c(0,1), max(reps)*n, replace=TRUE), c(max(reps),n))
+intervals <- seq(0, 99, by=1)
+mean_probs <- matrix(nrow=length(intervals), ncol=length(reps))
+for (k in 1:length(reps)) {
+  rep <- reps[k]
+  pb <- txtProgressBar(min = 0, max = length(intervals), style = 3,
+                       label = sprintf("rep = %d", rep))
+  prob <- rep(NA, rep)
+  for (j in 1:length(intervals)) {
+    for (i in 1:rep){
+      heads1 <- data[i,1:(n-1)][1:intervals[j]]==1
+      heads2 <- data[i,2:n][1:intervals[j]]==1
+      n_heads1 <- sum(heads1)
+      if (n_heads1 > 0) {
+        prob[i] <- sum(heads1 & heads2, na.rm=TRUE)/n_heads1
+      }
+    }
+    mean_probs[j,k] <- mean(prob, na.rm=TRUE)
+    setTxtProgressBar(pb, j)
+  }
+  close(pb)
+}
+
+#hot hand
+hot_hand <- rep(NA, n)
+hot_hand[1] <- mean(data[,1])
+for (i in 2:n){
+  hot_hand[i] <- mean(data[,i][data[,i-1]==1])
+}
+
+#cold hand
+cold_hand <- rep(NA, n)
+cold_hand[1] <- mean(data[,1])
+for (i in 2:n){
+  cold_hand[i] <- mean(data[,i][data[,i-1]==0])
+}
+```
+
+### 1A & B
+
+Nedenfor vises starten på datasettet Hvor intervals er antall kast og har tilsvarende "Cold hand" og "Hot hand" utfall.
+
+```{r, echo=FALSE}
+# 1 A og B
+df1 <- data.frame(Hot_Hand = hot_hand, Cold_Hand = cold_hand)
+head(df1)
+```
+
+### 2
+
+Vi endrer utvalg av M til både 1000, 100 og 10 for datasettet noe som gir oss dette datasettet:
+
+```{r, echo=FALSE}
+# 2
+result_df <- data.frame(intervals = intervals)
+for (k in 1:length(reps)) {
+  rep <- reps[k]
+  col_name_hot <- paste0("Hot Hand (", rep, ")")
+  col_name_cold <- paste0("Cold Hand (", rep, ")")
+  result_df[[col_name_hot]] <- mean_probs[,k]
+  result_df[[col_name_cold]] <- 1 - mean_probs[,k] }
+head(result_df)
+```
+
+### 3A
+
+Vi kan regne oss fram til gvt estimatet, $P(x_n=1|x_{n-1}=1) - P(x_n=1|x_{n-1}=0)$
+
+Gjennom R kode får vi et GVT estimat på:
+
+```{r, echo=FALSE}
+# 3 A
+gvt <- hot_hand[2:n] - cold_hand[2:n]
+gvt_est <- gvt[which(intervals == 1)]
+gvt_est
+```
+
+GVT verdien forteller oss sannsynligheten for at neste scoring blir en scoring gitt at forrige kast var en scoring, minus sannsynligheten for ny scoring gitt at forrige scoring var et bom.
+
+#### B
+
+Nedenfor vises grafisk illustrasjon av GVT estimatet for de ulike M verdiene, med ulik farger for å skille dem.
+
+```{r, echo=FALSE}
+# 3 B
+ggplot(result_df, aes(x = intervals)) +
+  geom_line(aes(y = mean_probs[,1], color = "M = 10")) +
+  geom_line(aes(y = mean_probs[,2], color = "M = 100")) +
+  geom_line(aes(y = mean_probs[,3], color = "M = 1000")) +
+  geom_line(aes(y = mean_probs[,4], color = "M = 10000")) +
+  geom_line(aes(y = mean_probs[,5], color = "M = 100000")) +
+  scale_color_manual(name = "", values = c("M = 10" = "blue", "M = 100" = "red", "M = 1000" = "green", "M = 10000" = "orange", "M = 100000" = "purple")) +
+  labs(x = "Antall skudd", y = "Sansynlighet", title = "GVT estimat")
+
+```
+
+##### Figur 1
+
+### 4 A
+
+Figur 1 forsøker å illustrere GVT estimatet som følge av antall skudd, fordelt etter antall simuleringer som ble brukt (M). Det vi observerer er at når M kunn er på 10 får vi en litt mer ustabil kurve, det forekommer av at ved færre observasjoner har de større utslag på grafen. Når M = 100 000 ser vi også denne effekten. Den lilla kurven er mye glattere på grunn av det høye antallet med observasjoner. Alle grafene har til felles med et lite dypp i sannsynlighet tidlig på x aksen. Jo høyere GVT estimatet er desto mer signifikant er effekten av "Hot hand". Estimatet blir mer nøyaktig ut ifra hvor stor M er, så i vårt tilfelle er det den lilla grafen som viser de mest nøyaktige utfallene.
+
+#### B
+
+GVT har sin nytte i form av sannsynlighet, men å bruke det til å bevise at hot hand fallacy ikke er korrekt blir feil. Selv om dette er et godt statistisk verktøy kan ikke GVT verdien ta hensyn til de individuelle forskjellene mellom basketspillerne. Faktorene som påvirker basketspillerne i det de skal skyte er mange. Motstanderens ferdighetsnivå for eksempel er ikke noe GVT kan ta hensyn til.
